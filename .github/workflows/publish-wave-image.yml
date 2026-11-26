@@ -1,8 +1,12 @@
 # Builds the BigCapital server image of this fork's Wave invoice patch and pushes it to Docker Hub as
 # <DOCKERHUB_USERNAME>/bigcapital-server:<upstream-version>-wave and :<upstream-version>-wave-<shortsha> (WAVE.md).
-# Manual only. It builds exactly as upstream's build-deploy-container.yml does (the repository root as the context,
-# packages/server/Dockerfile, linux/amd64 and linux/arm64); the upstream version is the nearest v* release tag the
-# dispatched commit descends from, so the fork must hold that tag.
+# Manual only. Like upstream's build-deploy-container.yml it builds packages/server/Dockerfile with the repository root
+# as the context, but for linux/amd64 only (the homelab that runs the image is amd64); the upstream version is the
+# nearest v* release tag the dispatched commit descends from, so the fork must hold that tag.
+#
+# Runs on the owner's self-hosted runner (label homelab-ci), so the fork must be in the installation of the owner's
+# hlx-homelab-ci GitHub App. Keep workflow_dispatch as the only trigger: only people with write access can start it,
+# so no outside pull request can run this job on that runner.
 #
 # Needs the repository variable DOCKERHUB_USERNAME and the repository secret DOCKERHUB_TOKEN (a Docker Hub access
 # token with Read & Write scope). The image is public and holds no secrets: configuration comes at run time.
@@ -20,7 +24,7 @@ concurrency:
 jobs:
   publish:
     name: Build and push to Docker Hub
-    runs-on: ubuntu-latest
+    runs-on: homelab-ci
     timeout-minutes: 120
     permissions:
       contents: read
@@ -64,9 +68,6 @@ jobs:
             echo "tags=${repo}:${version}-wave,${repo}:${version}-wave-${short}"
           } | tee -a "${GITHUB_OUTPUT}"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -82,8 +83,12 @@ jobs:
         with:
           context: ./
           file: ./packages/server/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
+          # Each runner is deleted after its job, so the layer cache lives in the GitHub Actions cache.
+          # mode=max keeps the builder stage too; a failed cache export does not fail a pushed build.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
           tags: ${{ steps.image.outputs.tags }}
           labels: |
             org.opencontainers.image.title=bigcapital-server

@@ -63,6 +63,8 @@ One-time setup:
 - Make `wave-invoice` the default branch (Settings > General > Default branch). GitHub only offers a manual run for a workflow that exists on the default branch, and the workflow exists only on `wave-invoice`.
 - Add the repository variable `DOCKERHUB_USERNAME` (Settings > Secrets and variables > Actions).
 - Add the repository secret `DOCKERHUB_TOKEN` in the same place: a Docker Hub access token with Read & Write scope.
+- Add the fork to the repositories of the owner's `hlx-homelab-ci` GitHub App installation. The job runs on the self-hosted `homelab-ci` runner, which only takes jobs from those repositories; without this the run stays queued.
+- Require approval for all external contributors (Settings > Actions > General > Fork pull request workflows). The fork is public, and a pull request can bring its own workflow that asks for `homelab-ci`, so read a pull request's workflow changes before approving its run.
 
 Then run **Publish Wave server image** on the `wave-invoice` branch, from the Actions tab or with:
 
@@ -70,7 +72,7 @@ Then run **Publish Wave server image** on the `wave-invoice` branch, from the Ac
 gh workflow run publish-wave-image.yml --repo rameskum/bigcapital --ref wave-invoice
 ```
 
-The workflow is manual only. It builds the way upstream's `build-deploy-container.yml` does: the repository root as the context, `packages/server/Dockerfile`, and `linux/amd64` plus `linux/arm64`. It pushes both tags and prints the digest in the log and the run summary. The arm64 half is emulated, so a run takes a while.
+The workflow is manual only, and must stay so: it runs on the owner's self-hosted runner. Like upstream's `build-deploy-container.yml` it builds `packages/server/Dockerfile` with the repository root as the context, but for `linux/amd64` only, because the homelab is amd64. It keeps the layer cache in the GitHub Actions cache, pushes both tags and prints the digest in the log and the run summary.
 
 ### By hand
 
@@ -81,7 +83,7 @@ USER=<docker-hub-username>
 VERSION=$(git describe --tags --abbrev=0 --match 'v[0-9]*')
 SHORT=$(git rev-parse --short=7 HEAD)
 docker login --username "$USER"                 # paste the access token when asked
-docker buildx build --platform linux/amd64,linux/arm64 \
+docker buildx build --platform linux/amd64 \
   --file packages/server/Dockerfile \
   --tag "$USER/bigcapital-server:$VERSION-wave" \
   --tag "$USER/bigcapital-server:$VERSION-wave-$SHORT" \
@@ -89,8 +91,6 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 docker buildx imagetools inspect "$USER/bigcapital-server:$VERSION-wave-$SHORT"   # prints the digest
 ```
 
-Multi-platform `--push` needs a buildx builder that uses the `docker-container` driver (`docker buildx create --use`), and QEMU for the foreign platform.
-
 ## The image is public and holds no secrets
 
-The repository on Docker Hub is public. The image holds what upstream's image holds: the open-source code built from this repository and its dependencies. `.dockerignore` keeps `.env` files, `.git` and CI files out of the build context, and the build takes no credentials. Database passwords, JWT secrets, mail and S3 keys all come from the environment when the container starts, exactly as with `bigcapitalhq/server`. Use it as a drop-in replacement for `bigcapitalhq/server` of the same version, including the one-off migration container.
+The repository on Docker Hub is public. The image holds what upstream's image holds: the open-source code built from this repository and its dependencies. `.dockerignore` keeps `.env` files, `.git` and CI files out of the build context, and the build takes no credentials. Database passwords, JWT secrets, mail and S3 keys all come from the environment when the container starts, exactly as with `bigcapitalhq/server`. On amd64, use it as a drop-in replacement for `bigcapitalhq/server` of the same version, including the one-off migration container.
