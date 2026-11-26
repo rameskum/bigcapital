@@ -1,4 +1,6 @@
 import { isEmpty } from 'lodash';
+import { css } from '@emotion/css';
+import { x } from '@xstyled/emotion';
 import {
   PaperTemplate,
   PaperTemplateProps,
@@ -122,6 +124,42 @@ export interface InvoicePaperTemplateProps extends PaperTemplateProps {
   taxes?: Array<InvoiceTaxLine>;
 }
 
+// Wave layout (fork patch, see WAVE.md at the repository root): a header band
+// with the logo on the left and the title and company block on the right, a
+// full-width rule, Bill To beside the invoice details box, an items table whose
+// coloured header band runs the full page width, the totals, the notes. The
+// side margin is Wave's 21.5pt (28px). The top bar is a border: the stock inset
+// shadow leaves a hairline down both edges of the printed page.
+const SIDE_MARGIN = 28;
+const fullBleed = { marginLeft: -SIDE_MARGIN, marginRight: -SIDE_MARGIN };
+const itemsBand = css`
+  table thead th {
+    background: var(--invoice-primary-color);
+    border-bottom: none;
+    font-weight: 700;
+    color: #000;
+    padding: 10px;
+  }
+  table thead th:first-of-type,
+  table tbody td:first-of-type {
+    padding-left: ${SIDE_MARGIN}px;
+  }
+  table thead th:last-of-type,
+  table tbody td:last-of-type {
+    padding-right: ${SIDE_MARGIN}px;
+  }
+  table tbody td {
+    border-bottom-color: #ddd;
+  }
+`;
+const detailCell = { padding: '2px 6px' };
+const detailLabel = {
+  ...detailCell,
+  fontWeight: 600,
+  textAlign: 'right' as const,
+};
+const amountDue = { background: '#f1f3f4' };
+
 export function InvoicePaperTemplate({
   // # Colors
   primaryColor,
@@ -217,82 +255,118 @@ export function InvoicePaperTemplate({
     <PaperTemplate
       primaryColor={primaryColor}
       secondaryColor={secondaryColor}
+      padding={`26px ${SIDE_MARGIN}px 30px`}
+      boxShadow={'none'}
+      borderTop={'4px solid var(--invoice-primary-color)'}
       {...props}
     >
       <Stack spacing={24}>
         <Group align="start" spacing={10}>
-          <Stack flex={1}>
-            <PaperTemplate.BigTitle title={'Invoice'} />
-
-            <PaperTemplate.TermsList>
-              {showInvoiceNumber && (
-                <PaperTemplate.TermsItem label={invoiceNumberLabel}>
-                  {invoiceNumber}
-                </PaperTemplate.TermsItem>
-              )}
-              {showDateIssue && (
-                <PaperTemplate.TermsItem label={dateIssueLabel}>
-                  {dateIssue}
-                </PaperTemplate.TermsItem>
-              )}
-              {showDueDate && (
-                <PaperTemplate.TermsItem label={dueDateLabel}>
-                  {dueDate}
-                </PaperTemplate.TermsItem>
-              )}
-            </PaperTemplate.TermsList>
-          </Stack>
-
-          {companyLogoUri && showCompanyLogo && (
-            <PaperTemplate.Logo logoUri={companyLogoUri} />
-          )}
+          <Box flex={1}>
+            {companyLogoUri && showCompanyLogo && (
+              <PaperTemplate.Logo logoUri={companyLogoUri} />
+            )}
+          </Box>
+          <Box flex={1} textAlign={'right'}>
+            <x.h1
+              fontSize={'36px'}
+              fontWeight={300}
+              lineHeight={1}
+              letterSpacing={'1px'}
+              margin={'0 0 12px'}
+              color={'#111'}
+            >
+              INVOICE
+            </x.h1>
+            {showCompanyAddress && (
+              <Box dangerouslySetInnerHTML={{ __html: companyAddress }} />
+            )}
+          </Box>
         </Group>
 
-        <PaperTemplate.AddressesGroup>
-          {showCompanyAddress && (
-            <PaperTemplate.Address>
-              <Box dangerouslySetInnerHTML={{ __html: companyAddress }} />
-            </PaperTemplate.Address>
-          )}
-          {showCustomerAddress && (
-            <PaperTemplate.Address>
-              <strong>{billedToLabel}</strong>
-              <Box dangerouslySetInnerHTML={{ __html: customerAddress }} />
-            </PaperTemplate.Address>
-          )}
-        </PaperTemplate.AddressesGroup>
+        <Box style={fullBleed} borderTop={'1px solid #ddd'} />
+
+        <Group align="start" spacing={10}>
+          <Box flex={1}>
+            {showCustomerAddress && (
+              <>
+                <Box color={'#888'} textTransform={'uppercase'}>
+                  {billedToLabel}
+                </Box>
+                <Box dangerouslySetInnerHTML={{ __html: customerAddress }} />
+              </>
+            )}
+          </Box>
+          <Box
+            display={'grid'}
+            gridTemplateColumns={'auto auto'}
+            alignContent={'start'}
+            marginLeft={'auto'}
+          >
+            {showInvoiceNumber && (
+              <>
+                <span style={detailLabel}>{invoiceNumberLabel}</span>
+                <span style={detailCell}>{invoiceNumber}</span>
+              </>
+            )}
+            {showDateIssue && (
+              <>
+                <span style={detailLabel}>{dateIssueLabel}</span>
+                <span style={detailCell}>{dateIssue}</span>
+              </>
+            )}
+            {showDueDate && (
+              <>
+                <span style={detailLabel}>{dueDateLabel}</span>
+                <span style={detailCell}>{dueDate}</span>
+              </>
+            )}
+            {showDueAmount && (
+              <>
+                <span style={{ ...detailLabel, ...amountDue }}>
+                  {dueAmountLabel}
+                </span>
+                <span style={{ ...detailCell, ...amountDue, fontWeight: 600 }}>
+                  {dueAmount}
+                </span>
+              </>
+            )}
+          </Box>
+        </Group>
 
         <Stack spacing={0}>
-          <PaperTemplate.Table
-            columns={[
-              {
-                label: lineItemLabel,
-                accessor: (data) => (
-                  <Stack spacing={2}>
-                    <Text>{data.item}</Text>
-                    <Text color={'#5f6b7c'} fontSize={12}>
-                      {data.description}
-                    </Text>
-                  </Stack>
-                ),
-                thStyle: { width: '60%' },
-              },
-              {
-                label: lineQuantityLabel,
-                accessor: 'quantity',
-                align: 'right',
-              },
-              { label: lineRateLabel, accessor: 'rate', align: 'right' },
-              {
-                label: lineDiscountLabel,
-                accessor: 'discount',
-                align: 'right',
-                visible: showLineDiscount,
-              },
-              { label: lineTotalLabel, accessor: 'total', align: 'right' },
-            ]}
-            data={lines}
-          />
+          <Box style={fullBleed} className={itemsBand}>
+            <PaperTemplate.Table
+              columns={[
+                {
+                  label: lineItemLabel,
+                  accessor: (data) => (
+                    <Stack spacing={2}>
+                      <Text>{data.item}</Text>
+                      <Text color={'#5f6b7c'} fontSize={12}>
+                        {data.description}
+                      </Text>
+                    </Stack>
+                  ),
+                  thStyle: { width: '60%' },
+                },
+                {
+                  label: lineQuantityLabel,
+                  accessor: 'quantity',
+                  align: 'right',
+                },
+                { label: lineRateLabel, accessor: 'rate', align: 'right' },
+                {
+                  label: lineDiscountLabel,
+                  accessor: 'discount',
+                  align: 'right',
+                  visible: showLineDiscount,
+                },
+                { label: lineTotalLabel, accessor: 'total', align: 'right' },
+              ]}
+              data={lines}
+            />
+          </Box>
           <PaperTemplate.Totals>
             {showSubtotal && (
               <PaperTemplate.TotalLine
