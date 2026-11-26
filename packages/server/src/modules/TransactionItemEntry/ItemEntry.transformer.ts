@@ -19,6 +19,7 @@ export class ItemEntryTransformer extends Transformer<
       'rateFormatted',
       'discountFormatted',
       'totalFormatted',
+      'lineAmountFormatted',
     ];
   };
 
@@ -62,6 +63,19 @@ export class ItemEntryTransformer extends Transformer<
    */
   protected totalFormatted = (entry: ItemEntry): string => {
     return this.formatNumber(entry.total, {
+      currencyCode: this.context.currencyCode,
+      money: false,
+    });
+  };
+
+  /**
+   * Retrieves the formatted line amount (qty * rate - line discount), without
+   * adding exclusive tax. This is the line amount the subtotal adds up to.
+   * @param {IItemEntry} entry
+   * @returns {string}
+   */
+  protected lineAmountFormatted = (entry: ItemEntry): string => {
+    return this.formatNumber(entry.amount - entry.discountAmount, {
       currencyCode: this.context.currencyCode,
       money: false,
     });

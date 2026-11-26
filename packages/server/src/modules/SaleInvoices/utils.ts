@@ -38,7 +38,7 @@ export const transformInvoiceToPdfTemplate = (
       description: entry.description,
       rate: entry.rateFormatted,
       quantity: entry.quantityFormatted,
-      total: entry.totalFormatted,
+      total: entry.lineAmountFormatted,
     })),
     taxes: invoice.taxes.map((tax) => ({
       label: tax.name,

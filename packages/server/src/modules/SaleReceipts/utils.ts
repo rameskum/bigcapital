@@ -13,7 +13,7 @@ export const transformReceiptToBrandingTemplateAttributes = (
       description: entry.description,
       rate: entry.rateFormatted,
       quantity: entry.quantityFormatted,
-      total: entry.totalFormatted,
+      total: entry.lineAmountFormatted,
     })),
     receiptNumebr: saleReceipt.receiptNumber,
     receiptDate: saleReceipt.formattedReceiptDate,

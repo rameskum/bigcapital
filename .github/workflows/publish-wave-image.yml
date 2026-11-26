@@ -1,16 +1,17 @@
-# Builds the BigCapital server image of this fork's Wave invoice patch and pushes it to Docker Hub as
-# <DOCKERHUB_USERNAME>/bigcapital-server:<upstream-version>-wave and :<upstream-version>-wave-<shortsha> (WAVE.md).
-# Manual only. Like upstream's build-deploy-container.yml it builds packages/server/Dockerfile with the repository root
-# as the context, but for linux/amd64 only (the homelab that runs the image is amd64); the upstream version is the
-# nearest v* release tag the dispatched commit descends from, so the fork must hold that tag.
+# Builds the BigCapital server and webapp images of this fork's patches and pushes them to Docker Hub as
+# <DOCKERHUB_USERNAME>/bigcapital-server and <DOCKERHUB_USERNAME>/bigcapital-webapp, each tagged
+# <upstream-version>-wave and <upstream-version>-wave-<shortsha> (WAVE.md).
+# Manual only. Like upstream's build-deploy-container.yml it builds packages/<server|webapp>/Dockerfile with the
+# repository root as the context, but for linux/amd64 only (the homelab that runs the images is amd64); the upstream
+# version is the nearest v* release tag the dispatched commit descends from, so the fork must hold that tag.
 #
 # Runs on the owner's self-hosted runner (label homelab-ci), so the fork must be in the installation of the owner's
 # hlx-homelab-ci GitHub App. Keep workflow_dispatch as the only trigger: only people with write access can start it,
-# so no outside pull request can run this job on that runner.
+# so no outside pull request can run these jobs on that runner.
 #
 # Needs the repository variable DOCKERHUB_USERNAME and the repository secret DOCKERHUB_TOKEN (a Docker Hub access
-# token with Read & Write scope). The image is public and holds no secrets: configuration comes at run time.
-name: Publish Wave server image
+# token with Read & Write scope). The images are public and hold no secrets: configuration comes at run time.
+name: Publish Wave images
 
 on:
   workflow_dispatch:
@@ -23,7 +24,15 @@ concurrency:
 
 jobs:
   publish:
-    name: Build and push to Docker Hub
+    name: Build and push the ${{ matrix.image }} image
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: server
+            description: with the invoice PDF in a Wave-style layout and line amounts before tax
+          - image: webapp
+            description: with the edit form totals fix
     runs-on: homelab-ci
     timeout-minutes: 120
     permissions:
@@ -54,6 +63,7 @@ jobs:
         id: image
         env:
           DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          IMAGE: ${{ matrix.image }}
         run: |
           set -euo pipefail
           if ! version="$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD)"; then
@@ -61,7 +71,7 @@ jobs:
             exit 1
           fi
           short="$(git rev-parse --short=7 HEAD)"
-          repo="${DOCKERHUB_USERNAME}/bigcapital-server"
+          repo="${DOCKERHUB_USERNAME}/bigcapital-${IMAGE}"
           {
             echo "version=${version}"
             echo "repo=${repo}"
@@ -82,17 +92,18 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./
-          file: ./packages/server/Dockerfile
+          file: ./packages/${{ matrix.image }}/Dockerfile
           platforms: linux/amd64
           push: true
           # Each runner is deleted after its job, so the layer cache lives in the GitHub Actions cache.
           # mode=max keeps the builder stage too; a failed cache export does not fail a pushed build.
-          cache-from: type=gha
-          cache-to: type=gha,mode=max,ignore-error=true
+          # One cache scope per image, so neither build evicts the other's cache entry.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max,ignore-error=true
           tags: ${{ steps.image.outputs.tags }}
           labels: |
-            org.opencontainers.image.title=bigcapital-server
-            org.opencontainers.image.description=BigCapital server ${{ steps.image.outputs.version }} with the invoice PDF in a Wave-style layout
+            org.opencontainers.image.title=bigcapital-${{ matrix.image }}
+            org.opencontainers.image.description=BigCapital ${{ matrix.image }} ${{ steps.image.outputs.version }} ${{ matrix.description }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.image.outputs.version }}-wave
@@ -109,7 +120,7 @@ jobs:
           echo "Digest: ${DIGEST}"
           echo "Pin: docker.io/${REPO}@${DIGEST}"
           {
-            echo "### Published"
+            echo "### Published ${REPO}"
             echo
             echo "- Tags: \`${TAGS}\`"
             echo "- Digest: \`${DIGEST}\`"
