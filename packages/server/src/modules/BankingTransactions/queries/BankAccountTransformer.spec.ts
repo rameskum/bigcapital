@@ -16,6 +16,13 @@ const buildAccount = (overrides: any = {}) =>
     ...overrides,
   }) as any;
 
+const buildTransformer = () => {
+  const transformer = new CashflowAccountTransformer();
+  transformer.setContext({ organization: { baseCurrency: 'USD' } });
+
+  return transformer;
+};
+
 describe('CashflowAccountTransformer', () => {
   it.each([
     ['bank', 'USD', true],
@@ -25,9 +32,7 @@ describe('CashflowAccountTransformer', () => {
   ] as const)(
     'returns reconciliation support for %s in %s',
     (accountType, currencyCode, supported) => {
-      const transformer = new CashflowAccountTransformer();
-      transformer.setContext({ organization: { baseCurrency: 'USD' } });
-      const [account] = transformer.work([
+      const [account] = buildTransformer().work([
         buildAccount({ accountType, currencyCode }),
       ]);
 
@@ -36,8 +41,7 @@ describe('CashflowAccountTransformer', () => {
   );
 
   it('exposes the institution logo as a data URL and hides the Plaid item', () => {
-    const transformer = new CashflowAccountTransformer();
-    const account = transformer.work(buildAccount());
+    const account = buildTransformer().work(buildAccount());
 
     expect(account.plaidInstitutionName).toBe('Bank of America');
     expect(account.plaidInstitutionLogo).toBe(
@@ -48,8 +52,7 @@ describe('CashflowAccountTransformer', () => {
   });
 
   it('returns a null logo when the item has no logo', () => {
-    const transformer = new CashflowAccountTransformer();
-    const account = transformer.work(
+    const account = buildTransformer().work(
       buildAccount({
         plaidItem: { plaidInstitutionName: 'Bank of America' },
       }),
