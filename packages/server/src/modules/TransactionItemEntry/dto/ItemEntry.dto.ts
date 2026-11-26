@@ -255,4 +255,12 @@ export class ItemEntryDto {
     required: false,
   })
   totalFormatted?: string;
+
+  @ApiProperty({
+    description:
+      'Formatted line amount (quantity * rate - discount), without adding exclusive tax',
+    example: '$98.00',
+    required: false,
+  })
+  lineAmountFormatted?: string;
 }

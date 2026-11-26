@@ -17,7 +17,7 @@ export const transformCreditNoteToPdfTemplate = (
       description: entry.description,
       rate: entry.rateFormatted,
       quantity: entry.quantityFormatted,
-      total: entry.totalFormatted,
+      total: entry.lineAmountFormatted,
     })),
     customerNote: creditNote.note,
     termsConditions: creditNote.termsConditions,
